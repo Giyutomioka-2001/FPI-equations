@@ -1,0 +1,55 @@
+\section*{Introduction}
+
+This study focuses on modeling the motion of bluff, angular particles (specifically pentagon-shaped) placed on a 2D horizontal plate, subjected to a constant vertical air flow in the \textit{z}-direction. In this setup, the particles are constrained to move only in the \textit{x--y} plane, while the air flows steadily upward through the bed from a base inlet. This represents a simplified 2D particle--fluid coupling problem, where the goal is to understand and quantify drag and lift forces arising due to interactions with the vertical fluid flow field.
+
+When particles cluster in certain regions of the domain, they reduce the local porosity (or fluid area fraction $\varepsilon$), thereby impeding the local flow. This results in an increase in local pressure, diversion of air to less crowded regions, and an overall non-uniform vertical velocity field. This coupling between local particle concentration and vertical fluid dynamics is central to the behavior of the system.
+
+Rather than solving the full 3D Navier--Stokes equations for the fluid phase, two modeling paths are considered:
+
+\begin{enumerate}
+    \item \textbf{Implicit modeling} via empirical drag laws (e.g., \textit{Ergun}, \textit{Darcy}, or \textit{Wen--Yu} formulations), which relate local fluid--particle drag to the porosity and relative velocity without solving for the pressure or velocity fields directly.
+    
+    \item \textbf{Explicit fluid modeling}, where the vertical fluid velocity $u_z(x, y)$ is computed based on conservation of mass through a non-uniform porous bed, and a pressure gradient force is applied to each particle using a known or computed $\nabla p$ field.
+\end{enumerate}
+
+In the simplest implicit model, the vertical superficial velocity at the inlet is assumed constant ($U_0$), and the local vertical velocity at each location is scaled by the local porosity:
+
+\[
+u_z(x, y) \approx U_0 \cdot \frac{1 - \phi(x, y)}{\langle 1 - \phi \rangle}
+\]
+
+This form ensures that regions with fewer particles (higher voidage) carry proportionally more flow, preserving mass conservation. It is conservative and simple to implement in a 2D simulation.
+
+For a more physically accurate representation, the \textbf{Ergun equation} relates the pressure drop $\Delta p$ to local porosity and flow rate, accounting for both viscous and inertial drag:
+
+\[
+\frac{\Delta p}{L} = \frac{150 \mu_f}{D_p^2} \cdot \frac{(1 - \varepsilon)^2}{\varepsilon^3} u + 1.75 \cdot \frac{\rho_f}{D_p} \cdot \frac{(1 - \varepsilon)}{\varepsilon^3} u |u|
+\]
+
+The resulting pressure gradient $\nabla p$ can be used to compute a pressure-induced drag (or buoyancy-like) force on each particle:
+
+\[
+\vec{F}_p = -V_p \nabla p
+\]
+
+Alternatively, if $\nabla p$ is not directly solved, the \textbf{pressure drag} can be captured implicitly using the standard aerodynamic drag equation:
+
+\[
+\vec{F}_d = \frac{1}{2} \rho_f C_d A_p u_{\text{rel}}^2
+\]
+
+Here, $u_{\text{rel}}$ is the vertical fluid velocity seen by the particle. Since the flow is normal to the particle face and the particles are bluff bodies (flat-faced), \textbf{form drag} dominates over skin-friction drag. This is appropriate for polygonal or irregular particles.
+
+Small horizontal forces (resembling \textbf{lift}) may also emerge due to asymmetry in pressure distribution or particle orientation. While often secondary, they can be included through analytical lift force expressions or approximated from shear gradients in the imposed flow.
+
+\bigskip
+
+In summary, the modeling strategy combines:
+\begin{itemize}
+    \item Area fraction-based porosity estimation,
+    \item Empirical drag laws (Ergun, Darcy),
+    \item Optional pressure-gradient force $-V_p \nabla p$,
+    \item Explicit force application in a 2D particle simulator using Pymunk.
+\end{itemize}
+
+This approach enables capturing the dominant fluid--particle interactions in a computationally efficient and physically relevant way, without needing to solve the full 3D Navier--Stokes equations.
