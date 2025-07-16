@@ -1,55 +1,157 @@
-\section*{Introduction}
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, graphicx, geometry, float}
+\geometry{margin=1in}
 
-This study focuses on modeling the motion of bluff, angular particles (specifically pentagon-shaped) placed on a 2D horizontal plate, subjected to a constant vertical air flow in the \textit{z}-direction. In this setup, the particles are constrained to move only in the \textit{x--y} plane, while the air flows steadily upward through the bed from a base inlet. This represents a simplified 2D particle--fluid coupling problem, where the goal is to understand and quantify drag and lift forces arising due to interactions with the vertical fluid flow field.
+\title{Modeling Particle Dynamics under Vertical Air Flow in a 2D Horizontal Domain}
+\author{}
+\date{}
 
-When particles cluster in certain regions of the domain, they reduce the local porosity (or fluid area fraction $\varepsilon$), thereby impeding the local flow. This results in an increase in local pressure, diversion of air to less crowded regions, and an overall non-uniform vertical velocity field. This coupling between local particle concentration and vertical fluid dynamics is central to the behavior of the system.
+\begin{document}
+\maketitle
 
-Rather than solving the full 3D Navier--Stokes equations for the fluid phase, two modeling paths are considered:
+\section*{1. Introduction and Physical Setup}
+This study focuses on modeling the motion of bluff, angular particles (specifically pentagon-shaped) placed on a 2D horizontal plate, subjected to a constant vertical air flow in the \( z \)-direction. In this setup, the particles are constrained to move only in the \( x \)--\( y \) plane, while the air flows steadily upward through the bed from a base inlet. This represents a simplified 2D particle-fluid coupling problem, where the goal is to understand and quantify drag and lift forces arising due to interactions with the vertical fluid flow field.
 
-\begin{enumerate}
-    \item \textbf{Implicit modeling} via empirical drag laws (e.g., \textit{Ergun}, \textit{Darcy}, or \textit{Wen--Yu} formulations), which relate local fluid--particle drag to the porosity and relative velocity without solving for the pressure or velocity fields directly.
-    
-    \item \textbf{Explicit fluid modeling}, where the vertical fluid velocity $u_z(x, y)$ is computed based on conservation of mass through a non-uniform porous bed, and a pressure gradient force is applied to each particle using a known or computed $\nabla p$ field.
-\end{enumerate}
+When particles cluster in certain regions of the domain, they reduce the local porosity (or fluid area fraction \( \varepsilon \)), thereby impeding the local flow. This results in an increase in local pressure, diversion of air to less crowded regions, and an overall non-uniform vertical velocity field. This coupling between local particle concentration and vertical fluid dynamics is central to the behavior of the system.
 
-In the simplest implicit model, the vertical superficial velocity at the inlet is assumed constant ($U_0$), and the local vertical velocity at each location is scaled by the local porosity:
-
-\[
-u_z(x, y) \approx U_0 \cdot \frac{1 - \phi(x, y)}{\langle 1 - \phi \rangle}
-\]
-
-This form ensures that regions with fewer particles (higher voidage) carry proportionally more flow, preserving mass conservation. It is conservative and simple to implement in a 2D simulation.
-
-For a more physically accurate representation, the \textbf{Ergun equation} relates the pressure drop $\Delta p$ to local porosity and flow rate, accounting for both viscous and inertial drag:
-
-\[
-\frac{\Delta p}{L} = \frac{150 \mu_f}{D_p^2} \cdot \frac{(1 - \varepsilon)^2}{\varepsilon^3} u + 1.75 \cdot \frac{\rho_f}{D_p} \cdot \frac{(1 - \varepsilon)}{\varepsilon^3} u |u|
-\]
-
-The resulting pressure gradient $\nabla p$ can be used to compute a pressure-induced drag (or buoyancy-like) force on each particle:
-
-\[
-\vec{F}_p = -V_p \nabla p
-\]
-
-Alternatively, if $\nabla p$ is not directly solved, the \textbf{pressure drag} can be captured implicitly using the standard aerodynamic drag equation:
-
-\[
-\vec{F}_d = \frac{1}{2} \rho_f C_d A_p u_{\text{rel}}^2
-\]
-
-Here, $u_{\text{rel}}$ is the vertical fluid velocity seen by the particle. Since the flow is normal to the particle face and the particles are bluff bodies (flat-faced), \textbf{form drag} dominates over skin-friction drag. This is appropriate for polygonal or irregular particles.
-
-Small horizontal forces (resembling \textbf{lift}) may also emerge due to asymmetry in pressure distribution or particle orientation. While often secondary, they can be included through analytical lift force expressions or approximated from shear gradients in the imposed flow.
-
-\bigskip
-
-In summary, the modeling strategy combines:
+Two modeling paths are considered:
 \begin{itemize}
-    \item Area fraction-based porosity estimation,
-    \item Empirical drag laws (Ergun, Darcy),
-    \item Optional pressure-gradient force $-V_p \nabla p$,
-    \item Explicit force application in a 2D particle simulator using Pymunk.
+    \item \textbf{(i) Implicit drag-based modeling} using empirical laws (e.g., Ergun, Darcy, Wen--Yu), where pressure effects are captured via closure relations.
+    \item \textbf{(ii) Explicit fluid modeling}, solving mass and momentum equations to obtain pressure and velocity fields over the domain.
 \end{itemize}
 
-This approach enables capturing the dominant fluid--particle interactions in a computationally efficient and physically relevant way, without needing to solve the full 3D Navier--Stokes equations.
+\section*{2. Governing Equations}
+
+\subsection*{2.1 Continuity Equation (Area-Averaged)}
+Assuming incompressible flow and using the area-averaged porosity \( \varepsilon(x, y) = 1 - \phi(x, y) \), the continuity equation becomes:
+\[
+\nabla \cdot (\varepsilon \vec{u}) = 0
+\]
+In this setup, the dominant component is the vertical velocity \( u_z(x, y) \), but due to porosity variations, lateral redistribution may occur.
+
+\subsection*{2.2 Conservation of Momentum (Area-Averaged Navier--Stokes)}
+The momentum equation for an incompressible Newtonian fluid with porosity becomes:
+\[
+\varepsilon \rho_f \left( \frac{\partial \vec{u}}{\partial t} + (\vec{u} \cdot \nabla)\vec{u} \right) = -\varepsilon \nabla p + \mu \nabla^2 \vec{u} + \vec{f}_d
+\]
+Where:
+\begin{itemize}
+    \item \( \vec{u} = (u_x, u_y, u_z) \): fluid velocity vector; \( u_z \) is the vertical velocity component
+    \item \( \mu \): dynamic viscosity
+    \item \( \vec{f}_d \): drag or interphase force per unit volume
+\end{itemize}
+
+Since \( u_z \) dominates and particles don’t move vertically, the vertical flux can be approximated as:
+\[
+\frac{\partial}{\partial z} (\varepsilon u_z) = 0 \Rightarrow \varepsilon u_z = \text{const.}
+\]
+We then scale the vertical velocity locally:
+\[
+\boxed{ u_z(x, y) = U_0 \cdot \frac{\langle \varepsilon \rangle}{\varepsilon(x, y)} }
+\]
+Where \( U_0 \) is the inlet superficial velocity and \( \langle \varepsilon \rangle \) is the domain-averaged porosity.
+
+\section*{3. Drag Force Models}
+
+\subsection*{3.1 Standard Drag Force (Resolved via Velocity)}
+If \( u_z(x, y) \) is known, the drag on a particle is:
+\[
+\boxed{ F_d = \frac{1}{2} \rho_f C_d A_p u_z^2 }
+\]
+Where:
+\begin{itemize}
+    \item \( \rho_f \): fluid density
+    \item \( C_d \): drag coefficient (function of Reynolds number, shape)
+    \item \( A_p \): projected area of the particle (normal to flow)
+\end{itemize}
+
+\subsection*{3.2 Pressure-Gradient Force (Explicit \( \nabla p \))}
+If pressure is solved explicitly, the pressure gradient in this vertical flow setup is taken as \( \frac{dp}{dz} \). The force is then:
+\[
+\boxed{ \vec{F}_p = -A_p \nabla p(x, y) = -A_p \frac{dp}{dz} \hat{z} }
+\]
+Where \( A_p \) is the projected area of the particle.
+
+\subsection*{3.3 Pressure Computation from PPE}
+To obtain \( \nabla p \), we solve the \textbf{Pressure Poisson Equation (PPE)}. In porous media, under steady incompressible flow:
+\[
+\vec{u}_z = -\frac{K(\varepsilon)}{\mu} \nabla p \quad \Rightarrow \quad \nabla \cdot (\varepsilon \vec{u}_z) = 0
+\]
+comes from combining Darcy's law for porous media with the area-averaged continuity equation under the assumption of incompressible, steady-state flow in a porous 2D medium. Substituting the Darcy relation into the continuity equation gives:
+\[
+\nabla \cdot \left( -\frac{\varepsilon K(\varepsilon)}{\mu} \nabla p \right) = 0
+\]
+This is a nonlinear elliptic PDE for the pressure field \( p(x, y) \). The steps are:
+\begin{enumerate}
+    \item Given \( \varepsilon(x, y) \), compute permeability \( K(\varepsilon) \).
+    \item Solve the above PPE numerically for \( p(x, y) \) using appropriate boundary conditions.
+    \item Compute the gradient: \( \nabla p(x, y) \), then:
+    \[
+    u_z(x, y) = -\frac{K(\varepsilon)}{\mu} \frac{dp}{dz}
+    \]
+    \item Use this \( u_z \) in drag force or pressure-gradient force computations.
+\end{enumerate}
+
+\section*{4. Ergun-Based Implicit Pressure Modeling}
+
+The \textbf{Ergun equation} provides pressure drop across a porous medium. Here, \( u_z \) is the vertical component:
+\[
+\boxed{ \frac{\Delta p}{L} = 150 \frac{\mu}{D_p^2} \frac{(1 - \varepsilon)^2}{\varepsilon^3} u_z + 1.75 \frac{\rho_f}{D_p} \frac{(1 - \varepsilon)}{\varepsilon^3} u_z |u_z| }
+\]
+
+\subsection*{Term Definitions}
+\begin{center}
+\begin{tabular}{ll}
+\( \Delta p / L \) & Pressure gradient (Pa/m), equivalent to \( dp/dz \) \\
+\( \mu \) & Dynamic viscosity (Pa·s) \\
+\( D_p \) & Particle diameter (m) \\
+\( \varepsilon \) & Porosity (\( 1 - \phi \)) \\
+\( \rho_f \) & Fluid density (kg/m\(^3\)) \\
+\( u_z \) & Local vertical velocity component (m/s) \\
+\end{tabular}
+\end{center}
+
+This can be rearranged to compute \( dp/dz \), then apply:
+\[
+\boxed{ \vec{F}_d = -A_p \cdot \frac{dp}{dz} \hat{z} }
+\]
+Alternatively, permeability can be derived as:
+\[
+K(\varepsilon) = \frac{\varepsilon^3 D_p^2}{150 (1 - \varepsilon)^2}
+\]
+and used in Darcy’s law:
+\[
+u_z = -\frac{K(\varepsilon)}{\mu} \frac{dp}{dz}
+\]
+
+\section*{5. Summary of Approaches}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3.8cm}|p{5.5cm}|p{3.5cm}|p{3.5cm}|}
+\hline
+\textbf{Approach} & \textbf{Description} & \textbf{Pros} & \textbf{Cons} \\
+\hline
+\textbf{Implicit Drag (Ergun/Darcy)} & Use empirical correlations to estimate drag based on porosity and flow & Easy to implement; no need for fluid solver & No direct pressure field; less accurate in complex geometries \\
+\hline
+\textbf{Explicit \( \nabla p \) Force} & Solve for \( p(x, y) \) using PPE; compute \( -A_p \nabla p \) & Physically consistent; captures pressure redistribution & Requires solving elliptic PDE for pressure field \\
+\hline
+\textbf{Scaled \( u_z \)-Based Drag} & Estimate vertical velocity from porosity field: \( u_z(x, y) \) scaled by \( \varepsilon \) & Simple, conservative, fast & Pressure effects are implicit; lacks detailed fluid dynamics \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{6. Implementation Notes}
+\begin{itemize}
+    \item Compute \( \phi(x, y) \) (area fraction of particles) \( \Rightarrow \varepsilon = 1 - \phi \)
+    \item Use \( \varepsilon \) to scale vertical velocity \( u_z \), or compute pressure
+    \item Drag force: \( \vec{F}_d = \frac{1}{2} \rho_f C_d A_p u_z^2 \)
+    \item Pressure-gradient force: \( \vec{F}_p = -A_p \frac{dp}{dz} \)
+    \item Pressure from PPE: solve \( \nabla \cdot \left( \frac{\varepsilon K(\varepsilon)}{\mu} \nabla p \right) = 0 \), then compute \( u_z \)
+\end{itemize}
+
+\section*{7. Concluding Remarks}
+In this 2D fluid-particle simulation, both empirical and PDE-based methods are viable for modeling fluid drag and pressure effects. The empirical (Ergun-type) model allows for simple computation of local drag based on porosity and flow, while the pressure-Poisson-based model enables spatial pressure mapping and more physically detailed force modeling. Future improvements may include solving coupled fluid equations and dynamic porosity updates.
+
+\end{document}
